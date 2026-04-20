@@ -1,1 +1,87 @@
-[]
+[
+  {
+    "prompt": "Replace all digits in \"My code is 9981 and yours is 42\" with HASH",
+    "name": "fn_substitute_string_with_regex",
+    "parameters": {
+      "source_string": "\"My code is 9981 and yours is 42\"",
+      "regex": "\\d+",
+      "replacement": "HASH"
+    }
+  },
+  {
+    "prompt": "Replace all spaces in 'Too many spaces here' with underscores",
+    "name": "fn_substitute_string_with_regex",
+    "parameters": {
+      "source_string": "'Too many spaces here'",
+      "regex": "\\s+[aeiouAEIOU]+",
+      "replacement": "underscores"
+    }
+  },
+  {
+    "prompt": "Substitute the word 'blue' with 'red' in 'The sky is blue and the ocean is blue'",
+    "name": "fn_substitute_string_with_regex",
+    "parameters": {
+      "source_string": "'The sky is blue and the ocean is blue'",
+      "regex": "'blue'",
+      "replacement": "red"
+    }
+  },
+  {
+    "prompt": "Greet alice",
+    "name": "fn_greet",
+    "parameters": {
+      "name": "alice"
+    }
+  },
+  {
+    "prompt": "Greet mario",
+    "name": "fn_greet",
+    "parameters": {
+      "name": "mario"
+    }
+  },
+  {
+    "prompt": "Reverse the string 'banana'",
+    "name": "fn_reverse_string",
+    "parameters": {
+      "s": "banana"
+    }
+  },
+  {
+    "prompt": "Reverse the string 'OpenAI'",
+    "name": "fn_reverse_string",
+    "parameters": {
+      "s": "OpenAI"
+    }
+  },
+  {
+    "prompt": "What is the sum of 12 and 58?",
+    "name": "fn_add_numbers",
+    "parameters": {
+      "a": 12.0,
+      "b": 58.0
+    }
+  },
+  {
+    "prompt": "What is the square root of 81?",
+    "name": "fn_get_square_root",
+    "parameters": {
+      "a": 81.0
+    }
+  },
+  {
+    "prompt": "Calculate the square root of 400",
+    "name": "fn_get_square_root",
+    "parameters": {
+      "a": 400.0
+    }
+  },
+  {
+    "prompt": "What is the sum of 1024 and 2048?",
+    "name": "fn_add_numbers",
+    "parameters": {
+      "a": 1024.0,
+      "b": 2048.0
+    }
+  }
+]

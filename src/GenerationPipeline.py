@@ -1,5 +1,5 @@
 from pydantic import BaseModel, PrivateAttr
-from typing import Any
+from typing import Any, Optional
 from llm_sdk import Small_LLM_Model
 import json
 from enum import Enum
@@ -21,6 +21,7 @@ class GenerationPipeline(BaseModel):
     functions_def: list[dict[str, str | dict[Any, Any]]]
 
     _output: dict[str, Any] = PrivateAttr(default_factory=dict)
+    _output_str: str = PrivateAttr(default_factory=str)
     _vocabulary: list[str] = PrivateAttr(default_factory=list)
     _parameters_types: list[Any] = PrivateAttr(default_factory=list)
     _generated_function: dict[Any, Any] = PrivateAttr(default_factory=dict)
@@ -38,43 +39,60 @@ class GenerationPipeline(BaseModel):
         )
         self.output['prompt'] = self.prompt
         system_prompt = self.get_system_prompt()
-        output_str = system_prompt
+        self._output_str = system_prompt
+        self.generate_function_name(decoder)
+        self.generate_parameters(decoder)
+
+    def generate_function_name(self, decoder: ConstrainingDecoder) -> None:
         fun_name_state = False
-        params_state = False
         generated_function_name = ""
         while fun_name_state is False:
-            logits = self.llm_pipeline(output_str)
+            logits = self.llm_pipeline(self._output_str)
             constrained_logits = decoder.constrain_function(
                 logits=logits, current_function_name=generated_function_name
             )
             selected_token = self.token_selection(constrained_logits)
+            if selected_token is None:
+                break
             generated_function_name += selected_token
-            output_str += selected_token
+            self._output_str += selected_token
             for function in self.functions_def:
                 if str(function['name']) in generated_function_name:
                     fun_name_state = True
                     self._generated_function = function
         self.output['name'] = self._generated_function['name']
+
+    def generate_parameters(self, decoder: ConstrainingDecoder) -> None:
         self.output['parameters'] = {}
+        params_state = False
         while params_state is False:
             for name, d_type in self._generated_function['parameters'].items():
                 p_type = d_type['type']
-                output_str += (f"\nParameter '{name}' of "
-                               f"type {p_type}: ")
+                self._output_str += (f"\nParameter '{name}': ")
                 generated_param = ""
+                logits = self.llm_pipeline(self._output_str)
+                constrained_logits = logits
                 selected_token = ""
-                while generated_param + selected_token in self.prompt:
-                    generated_param += selected_token
-                    output_str += selected_token
-                    logits = self.llm_pipeline(output_str)
+                while True:
                     constrained_logits = decoder.constrain_params(
                         logits=logits,
-                        current_params=str(generated_param),
-                        parameter_type=p_type
+                        current_param=str(generated_param),
+                        parameter=(name, p_type)
                     )
                     selected_token = self.token_selection(constrained_logits)
+                    if selected_token is None:
+                        break
+                    selected_token = selected_token.replace("Ġ", " ")
+                    if decoder.parameters_condition(
+                        parameter=(name, p_type),
+                        new_parameter=generated_param + selected_token
+                            ) is False:
+                        break
+                    generated_param += selected_token
+                    self._output_str += selected_token
+                    logits = self.llm_pipeline(self._output_str)
                 self.output['parameters'][name] = (
-                    float(generated_param)if p_type == "NUMBERS"
+                    float(generated_param) if p_type == "number"
                     else generated_param
                     )
             params_state = True
@@ -99,8 +117,10 @@ class GenerationPipeline(BaseModel):
         )
         return logits
 
-    def token_selection(self, logits: list[float]) -> str:
+    def token_selection(self, logits: list[float]) -> Optional[str]:
         trimmed = logits[:len(self._vocabulary)]
+        if all(x == float("-inf") for x in trimmed):
+            return None
         best_index = np.argmax(trimmed)
         return self._vocabulary[best_index]
 

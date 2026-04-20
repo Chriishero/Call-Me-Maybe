@@ -28,7 +28,7 @@ class PipelineManager(BaseModel):
             f.write('[]')
         for i in range(len(self.prompts)):
             print(f"[{i + 1}/{len(self.prompts)}] Generating response for "
-                  f"\"{self.prompts[i]['prompt']}\"")
+                  f"\"{self.prompts[i]['prompt']}\" ...")
             gen = GenerationPipeline(
                 model=self._model,
                 prompt=self.prompts[i]['prompt'],
@@ -60,4 +60,4 @@ class PipelineManager(BaseModel):
         with open(output_path, 'w') as f:
             content.append(to_save)
             f.write(json.dumps(content, indent=2))
-            print(f"Response saving in '{output_path}'")
+            print(f"Response saved in '{output_path}'")

@@ -1,35 +1,35 @@
 [
   {
-    "prompt": "Replace all numbers in \"Hello 34 I'm 233 years old\" with NUMBERS"
+    "prompt": "Replace all digits in \"My code is 9981 and yours is 42\" with HASH"
   },
   {
-    "prompt": "What is the sum of 2 and 3?"
+    "prompt": "Replace all spaces in 'Too many spaces here' with underscores"
   },
   {
-    "prompt": "What is the sum of 265 and 345?"
+    "prompt": "Substitute the word 'blue' with 'red' in 'The sky is blue and the ocean is blue'"
   },
   {
-    "prompt": "Greet shrek"
+    "prompt": "Greet alice"
   },
   {
-    "prompt": "Greet john"
+    "prompt": "Greet mario"
   },
   {
-    "prompt": "Reverse the string 'hello'"
+    "prompt": "Reverse the string 'banana'"
   },
   {
-    "prompt": "Reverse the string 'world'"
+    "prompt": "Reverse the string 'OpenAI'"
   },
   {
-    "prompt": "What is the square root of 16?"
+    "prompt": "What is the sum of 12 and 58?"
   },
   {
-    "prompt": "Calculate the square root of 144"
+    "prompt": "What is the square root of 81?"
   },
   {
-    "prompt": "Replace all vowels in 'Programming is fun' with asterisks"
+    "prompt": "Calculate the square root of 400"
   },
   {
-    "prompt": "Substitute the word 'cat' with 'dog' in 'The cat sat on the mat with another cat'"
+    "prompt": "What is the sum of 1024 and 2048?"
   }
 ]
