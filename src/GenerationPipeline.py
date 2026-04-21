@@ -1,15 +1,9 @@
-from pydantic import BaseModel, PrivateAttr
+from pydantic import BaseModel, PrivateAttr, Field
 from typing import Any, Optional
 from llm_sdk import Small_LLM_Model
 import json
-from enum import Enum
 import numpy as np
 from .ConstrainingDecoder import ConstrainingDecoder
-
-
-class GenerationState(Enum):
-    function_name = "function_name"
-    parameters = "parameters"
 
 
 class GenerationPipeline(BaseModel):
@@ -18,10 +12,12 @@ class GenerationPipeline(BaseModel):
     }
     model: Small_LLM_Model
     prompt: str
-    functions_def: list[dict[str, str | dict[Any, Any]]]
+    functions_def: list[dict[str, Any]]
+    max_fn_tokens: int = Field(default=32)
+    max_param_tokens: int = Field(default=64)
 
     _output: dict[str, Any] = PrivateAttr(default_factory=dict)
-    _output_str: str = PrivateAttr(default_factory=str)
+    _new_prompt: str = PrivateAttr(default_factory=str)
     _vocabulary: list[str] = PrivateAttr(default_factory=list)
     _parameters_types: list[Any] = PrivateAttr(default_factory=list)
     _generated_function: dict[Any, Any] = PrivateAttr(default_factory=dict)
@@ -37,65 +33,72 @@ class GenerationPipeline(BaseModel):
             vocabulary=self._vocabulary,
             functions_def=self.functions_def
         )
-        self.output['prompt'] = self.prompt
-        system_prompt = self.get_system_prompt()
-        self._output_str = system_prompt
+        self._output = {"prompt": self.prompt, "name": "", "parameters": {}}
+        self._new_prompt = self.get_system_prompt()
         self.generate_function_name(decoder)
         self.generate_parameters(decoder)
 
     def generate_function_name(self, decoder: ConstrainingDecoder) -> None:
-        fun_name_state = False
-        generated_function_name = ""
-        while fun_name_state is False:
-            logits = self.llm_pipeline(self._output_str)
+        token_count = 0
+        while token_count < self.max_fn_tokens:
+            logits = self.llm_pipeline(self._new_prompt)
             constrained_logits = decoder.constrain_function(
-                logits=logits, current_function_name=generated_function_name
+                logits=logits,
+                current_function_name=self.output['name']
             )
-            selected_token = self.token_selection(constrained_logits)
-            if selected_token is None:
+            token = self.token_selection(constrained_logits)
+            if token is None:
                 break
-            generated_function_name += selected_token
-            self._output_str += selected_token
+            print(token)
+            self.output['name'] += token
+            self._new_prompt += token
+            token_count += 1
             for function in self.functions_def:
-                if str(function['name']) in generated_function_name:
-                    fun_name_state = True
+                if str(function['name']) == self.output['name']:
                     self._generated_function = function
-        self.output['name'] = self._generated_function['name']
+                    break
+        if not self._generated_function:
+            raise ValueError(
+                f"Generated function name: {self.output['name']} does not "
+                "match any available function.")
 
     def generate_parameters(self, decoder: ConstrainingDecoder) -> None:
-        self.output['parameters'] = {}
-        params_state = False
-        while params_state is False:
-            for name, d_type in self._generated_function['parameters'].items():
-                p_type = d_type['type']
-                self._output_str += (f"\nParameter '{name}': ")
-                generated_param = ""
-                logits = self.llm_pipeline(self._output_str)
-                constrained_logits = logits
-                selected_token = ""
-                while True:
-                    constrained_logits = decoder.constrain_params(
-                        logits=logits,
-                        current_param=str(generated_param),
-                        parameter=(name, p_type)
+        for p_name, type_dict \
+                in self._generated_function['parameters'].items():
+            p_type = type_dict['type']
+            self.output['parameters'][p_name] = ""
+            print(self._generated_function['parameters'])
+            token_count = 0
+            while token_count < self.max_param_tokens:
+                logits = self.llm_pipeline(self._new_prompt)
+                constrained_logits = decoder.constrain_parameter(
+                    logits=logits,
+                    current_param=self.output['parameters'][p_name],
+                    parameter=(p_name, p_type)
+                )
+                token = self.token_selection(constrained_logits)
+                if token is None:
+                    break
+                if p_type == "string":
+                    token = token.replace("Ġ", " ")
+                else:
+                    token = token.replace("Ġ", "")
+                print(token)
+                if decoder.parameters_condition(
+                    parameter=(p_name, p_type),
+                    next_value=self.output['parameters'][p_name] + token
+                        ) is False:
+                    break
+                self.output['parameters'][p_name] += token
+                self._new_prompt += token
+                token_count += 1
+            try:
+                if p_type == "number":
+                    self.output['parameters'][p_name] = float(
+                        self.output['parameters'][p_name]
                     )
-                    selected_token = self.token_selection(constrained_logits)
-                    if selected_token is None:
-                        break
-                    selected_token = selected_token.replace("Ġ", " ")
-                    if decoder.parameters_condition(
-                        parameter=(name, p_type),
-                        new_parameter=generated_param + selected_token
-                            ) is False:
-                        break
-                    generated_param += selected_token
-                    self._output_str += selected_token
-                    logits = self.llm_pipeline(self._output_str)
-                self.output['parameters'][name] = (
-                    float(generated_param) if p_type == "number"
-                    else generated_param
-                    )
-            params_state = True
+            except Exception:
+                self.output['parameters'][p_name] = None
 
     def get_system_prompt(self) -> str:
         return (

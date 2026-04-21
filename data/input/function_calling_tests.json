@@ -1,35 +1,53 @@
 [
-  {
-    "prompt": "Replace all digits in \"My code is 9981 and yours is 42\" with HASH"
-  },
-  {
-    "prompt": "Replace all spaces in 'Too many spaces here' with underscores"
-  },
-  {
-    "prompt": "Substitute the word 'blue' with 'red' in 'The sky is blue and the ocean is blue'"
-  },
-  {
-    "prompt": "Greet alice"
-  },
-  {
-    "prompt": "Greet mario"
-  },
-  {
-    "prompt": "Reverse the string 'banana'"
-  },
-  {
-    "prompt": "Reverse the string 'OpenAI'"
-  },
-  {
-    "prompt": "What is the sum of 12 and 58?"
-  },
-  {
-    "prompt": "What is the square root of 81?"
-  },
-  {
-    "prompt": "Calculate the square root of 400"
-  },
-  {
-    "prompt": "What is the sum of 1024 and 2048?"
-  }
+  { "prompt": "Calculate the sum of 100 and 300" },
+  { "prompt": "Add the numbers 7 and" },
+  { "prompt": "What is 999 plus 1?" },
+  { "prompt": "Add 123 and ouioui" },
+  { "prompt": "Compute the sum of 88 and 22" },
+  { "prompt": "Add 0 and 42" },
+  { "prompt": "What is the sum of 19 and 81?" },
+  { "prompt": "Add 300 and 700" },
+  { "prompt": "Reverse the word 'Nice'" },
+  { "prompt": "Reverse the string '12345'" },
+  { "prompt": "Reverse the phrase 'open the door'" },
+  { "prompt": "Reverse the word 'mirror'" },
+  { "prompt": "What is the sum of 12 and 8?" },
+  { "prompt": "Add 45 and 55" },
+  { "prompt": "Greet Sarah" },
+  { "prompt": "Say hello to Mark" },
+  { "prompt": "Greet my friend Lucas" },
+  { "prompt": "Say welcome to Emma" },
+  { "prompt": "Greet the user named 'Tom'" },
+  { "prompt": "Please greet Olivia" },
+  { "prompt": "Greet the person called Noah" },
+  { "prompt": "Say hi to Chloe" },
+  { "prompt": "Greet Benjamin politely" },
+  { "prompt": "Greet 'Sophie' for me" },
+
+  { "prompt": "Reverse the word 'banana'" },
+  { "prompt": "Reverse the string 'abcdef'" },
+  { "prompt": "Reverse the phrase 'coding is fun'" },
+  { "prompt": "Reverse the string 'night sky'" },
+  { "prompt": "Reverse the phrase 'I love Python'" },
+  { "prompt": "Reverse the word 'dynamic'" },
+
+  { "prompt": "What is the square root of 49?" },
+  { "prompt": "Calculate the square root of 121" },
+  { "prompt": "Find the square root of 16" },
+  { "prompt": "Compute sqrt of 144" },
+  { "prompt": "What is sqrt 81?" },
+  { "prompt": "Square root of 400 please" },
+  { "prompt": "Find the square root of 225" },
+  { "prompt": "What is the square root of 900?" },
+  { "prompt": "Compute the sqrt of 1024" },
+  { "prompt": "Calculate sqrt of 36" },
+
+  { "prompt": "Greet the person named 'Alex'" },
+  { "prompt": "Reverse the string 'palindrome'" },
+  { "prompt": "Add 56 and 44" },
+  { "prompt": "What is the square root of 169?" },
+  { "prompt": "Greet my colleague Anna" },
+  { "prompt": "Reverse the phrase 'testing reverse function'" },
+  { "prompt": "Add 1 and 2" },
+  { "prompt": "Compute the square root of 196" }
 ]

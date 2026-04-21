@@ -57,7 +57,11 @@ class PipelineManager(BaseModel):
                 content = list(json.loads(f.read()))
         except (FileNotFoundError, json.JSONDecodeError):
             content = []
-        with open(output_path, 'w') as f:
-            content.append(to_save)
-            f.write(json.dumps(content, indent=2))
-            print(f"Response saved in '{output_path}'")
+        try:
+            with open(output_path, 'w') as f:
+                content.append(to_save)
+                f.write(json.dumps(content, indent=2))
+                print(f"Response saved in '{output_path}'")
+        except Exception as e:
+            raise ValueError(
+                f"Failed to write the output in {output_path}: {e}")
