@@ -24,6 +24,7 @@ class PipelineManager(BaseModel):
     def generate_outputs(self, output_path: str) -> None:
         self.load_model()
         i = 1
+        self.check_output_dir(output_path=output_path)
         with open(output_path, 'w') as f:
             f.write('[]')
         for i in range(len(self.prompts)):
@@ -44,14 +45,6 @@ class PipelineManager(BaseModel):
             output_path: str = "data/output/function_calling_results.json",
             to_save: dict[str, Any] = {}
             ) -> None:
-        output_dir = os.path.dirname(output_path)
-        if output_dir != '' and not os.path.isdir(output_dir):
-            try:
-                os.makedirs(output_dir)
-            except Exception as e:
-                raise ValueError(
-                    f"Failed create directory '{output_dir}': {e}"
-                    )
         try:
             with open(output_path, 'r') as f:
                 content = list(json.loads(f.read()))
@@ -65,3 +58,13 @@ class PipelineManager(BaseModel):
         except Exception as e:
             raise ValueError(
                 f"Failed to write the output in {output_path}: {e}")
+
+    def check_output_dir(self, output_path: str) -> None:
+        output_dir = os.path.dirname(output_path)
+        if output_dir != '' and not os.path.isdir(output_dir):
+            try:
+                os.makedirs(output_dir)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed create directory '{output_dir}': {e}"
+                    )
