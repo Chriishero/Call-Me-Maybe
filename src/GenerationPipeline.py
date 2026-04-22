@@ -49,7 +49,6 @@ class GenerationPipeline(BaseModel):
             token = self.token_selection(constrained_logits)
             if token is None:
                 break
-            print(token)
             self.output['name'] += token
             self._new_prompt += token
             token_count += 1
@@ -67,7 +66,6 @@ class GenerationPipeline(BaseModel):
                 in self._generated_function['parameters'].items():
             p_type = type_dict['type']
             self.output['parameters'][p_name] = ""
-            print(self._generated_function['parameters'])
             token_count = 0
             while token_count < self.max_param_tokens:
                 logits = self.llm_pipeline(self._new_prompt)
@@ -83,7 +81,6 @@ class GenerationPipeline(BaseModel):
                     token = token.replace("Ġ", " ")
                 else:
                     token = token.replace("Ġ", "")
-                print(token)
                 if decoder.parameters_condition(
                     parameter=(p_name, p_type),
                     next_value=self.output['parameters'][p_name] + token

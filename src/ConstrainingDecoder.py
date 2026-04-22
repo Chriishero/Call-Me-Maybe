@@ -200,7 +200,6 @@ class ConstrainingDecoder(BaseModel):
             if quote not in self._replacements_candidates \
                     and quote != self._source_string:
                 self._regex_candidates.add(quote)
-        print(self._regex_candidates)
 
     def load_replacement_candidates(self) -> None:
         if hasattr(self, "_replacement_candidates"):
