@@ -5,10 +5,12 @@ import sys
 
 
 def is_path(path: str) -> bool:
+    """Check if the argument is a path or not."""
     return not path.startswith("--")
 
 
 def get_all_path() -> tuple[str, str, str]:
+    """Get input and output files path from the arguments."""
     argv = sys.argv[1:]
     function_calling_tests = "data/input/function_calling_tests.json"
     functions_definition = "data/input/functions_definition.json"
@@ -29,6 +31,7 @@ def get_all_path() -> tuple[str, str, str]:
 
 
 def main() -> None:
+    """Main function"""
     input_path, funs_def, output_path = get_all_path()
     try:
         parser = InputParser(

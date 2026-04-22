@@ -7,6 +7,10 @@ from .ConstrainingDecoder import ConstrainingDecoder
 
 
 class GenerationPipeline(BaseModel):
+    """Runs the LLM pipeline and apply constrained decoding
+    before token selection from the given prompt, functions definition
+    and model.
+    Then save the function-calling output in an attribute."""
     model_config = {
         "arbitrary_types_allowed": True
     }
@@ -24,9 +28,12 @@ class GenerationPipeline(BaseModel):
 
     @property
     def output(self) -> dict[str, Any]:
+        """Getter for the class attribute '_output'"""
         return self._output
 
     def generate_output(self) -> None:
+        """Generate the function-calling output by calling
+        the two adequates functions for function name and parameters."""
         self.load_vocabulary()
         decoder = ConstrainingDecoder(
             prompt=self.prompt,
@@ -39,6 +46,8 @@ class GenerationPipeline(BaseModel):
         self.generate_parameters(decoder)
 
     def generate_function_name(self, decoder: ConstrainingDecoder) -> None:
+        """Execute the LLM pipeline and apply constrained decoding before
+        token selection, to generate the function name."""
         token_count = 0
         while token_count < self.max_fn_tokens:
             logits = self.llm_pipeline(self._new_prompt)
@@ -62,6 +71,8 @@ class GenerationPipeline(BaseModel):
                 "match any available function.")
 
     def generate_parameters(self, decoder: ConstrainingDecoder) -> None:
+        """Execute the LLM pipeline and apply constrained decoding before
+        token selection, to generate the parameters."""
         for p_name, type_dict \
                 in self._generated_function['parameters'].items():
             p_type = type_dict['type']
@@ -98,6 +109,7 @@ class GenerationPipeline(BaseModel):
                 self.output['parameters'][p_name] = None
 
     def get_system_prompt(self) -> str:
+        """Return the system prompt."""
         return (
             "You are a specialized agent in function calling.\n"
             "Your goal is, from some available functions, "
@@ -110,6 +122,7 @@ class GenerationPipeline(BaseModel):
             f"and the prompt is {self.prompt}.\n")
 
     def llm_pipeline(self, text: str) -> list[float]:
+        """Runs the tokenization and process the logits."""
         input_ids = self.model.encode(text)
         input_ids_list = input_ids[0].tolist()
         logits: list[float] = self.model.get_logits_from_input_ids(
@@ -118,6 +131,7 @@ class GenerationPipeline(BaseModel):
         return logits
 
     def token_selection(self, logits: list[float]) -> Optional[str]:
+        """Return the token with the highest probability."""
         trimmed = logits[:len(self._vocabulary)]
         if all(x == float("-inf") for x in trimmed):
             return None
@@ -125,6 +139,7 @@ class GenerationPipeline(BaseModel):
         return self._vocabulary[best_index]
 
     def load_vocabulary(self) -> None:
+        """Load the vocabulary using by the LLM in '_vocabulary'."""
         try:
             with open(self.model.get_path_to_vocab_file(), 'r') as f:
                 vocab_dict: dict[str, int] = json.loads(f.read())

@@ -1,25 +1,28 @@
-from pydantic import BaseModel, PrivateAttr
+from pydantic import BaseModel
 from typing import Any
 import re
 
 
 class ConstrainingDecoder(BaseModel):
+    """
+    Decoder applying token-level constraints to ensure that
+    generated function names and parameters are adapted to
+    the prompt.
+    """
     prompt: str
     vocabulary: list[str]
     functions_def: list[dict[str, Any]]
 
-    _source_string: str = PrivateAttr(default="")
-    _regex: str = PrivateAttr(default="")
-    _replacement: str = PrivateAttr(default="")
-    _s: str = PrivateAttr(default="")
-
     def constrain_function(
             self, logits: list[float], current_function_name: str
             ) -> list[float]:
-        self.load_functions_quandidates()
+        """Apply constrained decoding for functions name and
+        return the updated logit list.
+        """
+        self.load_functions_candidates()
         for i in range(len(self.vocabulary)):
             right_prefix = False
-            for function in self._function_quandidates:
+            for function in self._function_candidates:
                 if function.startswith(
                     current_function_name + self.vocabulary[i]
                 ):
@@ -31,6 +34,14 @@ class ConstrainingDecoder(BaseModel):
     def parameters_condition(
             self, parameter: tuple[str, str], next_value: str
             ) -> bool:
+        """Condition of every parameters to stop, or continue,
+        the token generation.
+
+        Keyword arguments:
+        parameter -- tuple with the parameter name and its type
+        next_value -- concatenation of the current generated parameter
+                      and the POTENTIALLY next token
+        """
         parameter_name = parameter[0]
         parameter_type = parameter[1]
         if parameter_type == "number":
@@ -39,57 +50,41 @@ class ConstrainingDecoder(BaseModel):
                 return True
             try:
                 if parameter_name == 'a':
-                    if nums[0].startswith(next_value):
-                        return True
+                    return bool(nums[0].startswith(next_value))
                 elif parameter_name == 'b':
-                    if nums[1].startswith(next_value):
-                        return True
+                    return bool(nums[1].startswith(next_value))
+                else:
+                    return any(n.startswith(next_value) for n in nums)
             except IndexError:
                 return False
         elif parameter_type == "string":
-            if parameter_name == "source_string":
-                self.load_quotes()
-                if any(quote.startswith(next_value)
-                       for quote in self._quotes):
-                    self._source_string = next_value
-                    return True
-            elif parameter_name == "regex":
-                self.load_regex_candidates()
-                if any(regex.startswith(next_value)
-                       for regex in self._regex_candidates):
-                    self._regex = next_value
-                    return True
-            elif parameter_name == "replacement":
-                self.load_replacement_candidates()
-                if any(rep.strip("'").strip('"').startswith(next_value)
-                       for rep in self._replacements_candidates):
-                    self._replacement = next_value
-                    return True
-            elif parameter_name == "s":
-                self.load_reverse_candidates()
-                if any(c.strip("'").strip('"').startswith(next_value)
-                        for c in self._reverse_candidates):
-                    self._s = next_value
-                    return True
-            else:
-                if any(word.strip('"').strip("'").startswith(next_value)
-                       for word in self.prompt.split(' ')):
-                    return True
+            candidates = self._get_candidates(parameter_name)
+            if not candidates:
+                self._load_prompt_words()
+                words = self._cached_prompt_words
+                return any(
+                    w.startswith(next_value) for w in words
+                )
+            return any(c.startswith(next_value) for c in candidates)
         return False
 
     def constrain_parameter(
             self, logits: list[float], current_param: str,
             parameter: tuple[str, str]
     ) -> list[float]:
+        """Apply constrained decoding for parameter depending
+        of its type. Return the updated logit list.
+        """
         parameter_name = parameter[0]
         parameter_type = parameter[1]
         for i in range(len(self.vocabulary)):
-            new_parameter = current_param + self.vocabulary[i]
+            token = self.vocabulary[i]
+            new_parameter = current_param + token
             if parameter_type == "number":
                 logits[i] = self.constrain_number(
                     parameter_name=parameter_name,
                     current_param=current_param,
-                    token=self.vocabulary[i],
+                    token=token,
                     logit=logits[i]
                 )
             elif parameter_type == "string":
@@ -104,6 +99,9 @@ class ConstrainingDecoder(BaseModel):
             self, parameter_name: str, current_param: str,
             token: str, logit: float
             ) -> float:
+        """Apply the constrained decoding specifically on the parameters
+        of type 'number'. Return the update logit.
+        """
         token = token.replace("Ġ", "")
         if not token.isdigit():
             return float("-inf")
@@ -115,6 +113,9 @@ class ConstrainingDecoder(BaseModel):
             elif parameter_name == 'b':
                 if nums[1].startswith(current_param + token):
                     return logit
+            else:
+                if any(n.startswith(current_param + token) for n in nums):
+                    return logit
         except IndexError:
             return float("-inf")
         return float("-inf")
@@ -123,39 +124,57 @@ class ConstrainingDecoder(BaseModel):
             self, parameter_name: str,
             new_parameter: str, logit: float,
             ) -> float:
+        """Apply the constrained decoding specifically on the parameters
+        of type 'string'. Return the update logit.
+        """
         new_parameter = new_parameter.replace("Ġ", " ")
-        if parameter_name == "source_string":
-            self.load_quotes()
-            for quote in self._quotes:
-                if quote.startswith(new_parameter):
+        candidates = self._get_candidates(parameter_name)
+        if candidates:
+            for c in candidates:
+                if c.startswith(new_parameter):
                     return logit
-        elif parameter_name == "regex":
-            self.load_regex_candidates()
-            for regex in self._regex_candidates:
-                if regex.startswith(new_parameter):
-                    return logit
-        elif parameter_name == "replacement":
-            self.load_replacement_candidates()
-            for rep in self._replacements_candidates:
-                if rep.startswith(new_parameter):
-                    return logit
-        elif parameter_name == "s":
-            self.load_reverse_candidates()
-            for word in self._reverse_candidates:
-                word = word.strip("'\".,?!")
-                if word.startswith(new_parameter):
-                    return logit
+            return float("-inf")
         else:
-            for word in self.prompt.split(' '):
-                word = word.strip("'\".,?!")
+            self._load_prompt_words()
+            for word in self._cached_prompt_words:
                 if word.startswith(new_parameter):
                     return logit
-        return float("-inf")
+            return float("-inf")
 
-    def load_functions_quandidates(self) -> None:
-        if hasattr(self, "_function_quandidates"):
+    def _get_candidates(self, parameter_name: str) -> set[str]:
+        """Call the functions that load the candidate values for a specific
+        parameter. Return the candidates set.
+        """
+        if parameter_name == "source_string":
+            self._load_source_candidates()
+            return self._source_candidates
+        elif parameter_name == "regex":
+            self._load_regex_candidates()
+            return self._regex_candidates
+        elif parameter_name == "replacement":
+            self._load_replacement_candidates()
+            return self._replacement_candidates
+        elif parameter_name == "s":
+            self._load_reverse_candidates()
+            return self._reverse_candidates
+        else:
+            self._load_prompt_words()
+            return self._cached_prompt_words
+
+    def _load_prompt_words(self) -> None:
+        """Load all the words of the prompt in a class attribute."""
+        if hasattr(self, "_cached_prompt_words"):
             return
-        self._function_quandidates = set()
+        self._cached_prompt_words = set()
+        self._cached_prompt_words.update(
+            [w.strip("'\".,?!:;") for w in self.prompt.split()
+             if w.strip("'\".,?!:;")])
+
+    def load_functions_candidates(self) -> None:
+        """Load all the potential function names depending of the prompt"""
+        if hasattr(self, "_function_candidates"):
+            return
+        self._function_candidates = set()
         numbers = re.findall(r"\d+", self.prompt)
         for function in self.functions_def:
             params = function["parameters"]
@@ -164,71 +183,107 @@ class ConstrainingDecoder(BaseModel):
             )
             if has_number_param and not numbers:
                 continue
-            self._function_quandidates.add(function["name"])
+            self._function_candidates.add(function["name"])
 
-    def load_quotes(self) -> None:
-        if hasattr(self, "_quotes"):
+    def _load_source_candidates(self) -> None:
+        """Load all the potentially candidates for parameters
+        of name 'source_string'.
+        """
+        if hasattr(self, "_source_candidates"):
             return
-        self._quotes = set()
-        quotes = re.findall(r"'.*?'|\".*?\"", self.prompt)
-        for quote in quotes:
-            self._quotes.add(fr"{quote[1:-1]}")
+        self._source_candidates = set()
+        prompt_lower = self.prompt.lower()
+        match = re.search(
+            r"in ?(?:the )?(?:string |phrase )?(\".+?\"|'.+?')",
+            prompt_lower)
+        if match:
+            candidate = match.group(1).strip("'\"")
+            pos = prompt_lower.find(candidate)
+            if pos != -1:
+                self._source_candidates.add(
+                    self.prompt[pos:pos + len(candidate)])
+        if not self._source_candidates:
+            quotes = re.findall(r"'([^']*)'|\"([^\"]*)\"", self.prompt)
+            values = [q[0] or q[1] for q in quotes if q[0] or q[1]]
+            if values:
+                self._source_candidates.add(max(values, key=len))
 
-    def load_regex_candidates(self) -> None:
+    def _load_regex_candidates(self) -> None:
+        """Load all the potentially candidates for parameters
+        of name 'regex'.
+        """
         if hasattr(self, "_regex_candidates"):
             return
         self._regex_candidates = set()
         prompt_lower = self.prompt.lower()
-        if "number" in prompt_lower:
-            self._regex_candidates.add(r"\d+")
-        if "digit" in prompt_lower:
-            self._regex_candidates.add(r"[0-9]")
-        if "words" in prompt_lower:
-            self._regex_candidates.add(r"\w+")
-        if "letter" in prompt_lower:
-            self._regex_candidates.add(r"[a-zA-z]")
-        if any(w in prompt_lower for w in ("space", "indent", "line")):
-            self._regex_candidates.add(r"\s")
-        if "vowel" in prompt_lower:
-            self._regex_candidates.add(r"[aeiouAEIOU]")
-        if "consonant" in prompt_lower:
-            self._regex_candidates.add(
-                r"[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]")
-        self.load_quotes()
-        self.load_replacement_candidates()
-        for quote in self._quotes:
-            if quote not in self._replacements_candidates \
-                    and quote != self._source_string:
-                self._regex_candidates.add(quote)
+        semantic = [
+            (r'\bnumber[s]?\b',     r'\d+'),
+            (r'\bdigit[s]?\b',      r'[0-9]'),
+            (r'\bword[s]?\b',       r'\w+'),
+            (r'\bletter[s]?\b',     r'[a-zA-Z]'),
+            (r'\bspace[s]?\b',      r'\s'),
+            (r'\bwhitespace\b',     r'\s'),
+            (r'\bvowel[s]?\b',      r'[aeiouAEIOU]'),
+            (r'\bconsonant[s]?\b',
+             r'[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]'),
+        ]
+        for pattern, regex_val in semantic:
+            if re.search(pattern, prompt_lower):
+                self._regex_candidates.add(regex_val)
+        self._load_replacement_candidates()
+        quoted_words = re.findall(r"'(\w+)'|\"(\w+)\"", self.prompt)
+        for quote in quoted_words:
+            value = quote[0] or quote[1]
+            if value and value not in self._replacement_candidates:
+                self._regex_candidates.add(value)
 
-    def load_replacement_candidates(self) -> None:
+    def _load_replacement_candidates(self) -> None:
+        """Load all the potentially candidates for parameters
+        of name 'replacement'.
+        """
         if hasattr(self, "_replacement_candidates"):
             return
-        self._replacements_candidates = set()
+        self._replacement_candidates = set()
         words_next = re.findall(
             r"\b(?:with|by|to)\s+(\S+)", self.prompt
         )
+        natural_to_symbol = {
+            'underscores': '_',
+            'asterisks':   '*',
+            'hashes':      '#',
+            'hash':        '#',
+            'stars':       '*',
+            'dashes':      '-',
+            'dots':        '.',
+        }
         for w in words_next:
-            if w != self._regex and w != self._source_string:
-                self._replacements_candidates.add(
-                    fr"{w.strip().strip("'").strip('"')}")
+            clean = w.strip().strip("'\"")
+            translated = natural_to_symbol.get(clean.lower(), clean)
+            self._replacement_candidates.add(translated)
+            if translated != clean:
+                self._replacement_candidates.add(clean)
 
-    def load_reverse_candidates(self) -> None:
+    def _load_reverse_candidates(self) -> None:
+        """Load all the potentially candidates for parameters
+        of name 's'.
+        """
         if hasattr(self, "_reverse_candidates"):
             return
         self._reverse_candidates = set()
-        self.load_quotes()
-        self._reverse_candidates.update(self._quotes)
+        self._load_source_candidates()
+        self._reverse_candidates.update(self._source_candidates)
+
         prompt_lower = self.prompt.lower()
         if "word" in prompt_lower:
-            match = re.search(
-                r"reverse ?(?:the )?(?:word )?(\S+)",
-                prompt_lower)
+            match = re.search(r"reverse ?(?:the )?(?:word )?(\S+)",
+                              prompt_lower)
         else:
             match = re.search(
-                r"reverse ?(?:the )?(?:string |phrase)?(.+?)",
+                r"reverse ?(?:the )?(?:string |phrase )?('.+'|\".+\"|.+)",
                 prompt_lower)
         if match:
-            candidate = match.group(1).strip(" .!?")
+            candidate = match.group(1).strip("'\"")
             pos = prompt_lower.find(candidate)
-            self._reverse_candidates.add(self.prompt[pos:len(candidate)])
+            if pos != -1:
+                self._reverse_candidates.add(
+                    self.prompt[pos:pos + len(candidate)])

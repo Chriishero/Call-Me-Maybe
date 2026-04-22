@@ -1,4 +1,25 @@
 [
+  { "prompt": "the string 'abcdef' or not" },
+  { "prompt": "maybe the phrase 'coding is fun i think" },
+  { "prompt": "i want you to do nothing with the string 'night sky'" },
+  { "prompt": "Reverse the phrase 'I love Python' please"},
+  { "prompt": "Reverse the word 'dynamic'" },
+  { "prompt": "Reverse the word 'Nice'" },
+  { "prompt": "maybe not replace the string '12345'" },
+  { "prompt": "Reverse the phrase 'open the door'" },
+  { "prompt": "Reverse the word 'mirror'" },
+  { "prompt": "Replace all numbers in 'Hello 34 I am 233 years old' with 'NUM'" },
+  { "prompt": "Substitute the word 'cat' with 'dog' in 'the cat sat on the mat'" },
+  { "prompt": "Replace all vowels in 'Programming is fun' with '*'" },
+  { "prompt": "Replace all spaces in 'open the door' with '_'" },
+  { "prompt": "Substitute 'Python' with 'C' in 'I love Python'" },
+  { "prompt": "Replace all digits in 'A1B2C3' with '#'" },
+  { "prompt": "Replace the substring 'ana' with 'XYZ' in 'banana'" },
+  { "prompt": "Substitute all consonants in 'hello world' with '!'" },
+  { "prompt": "Replace all occurrences of 'oo' with 'ee' in 'good food'" },
+  { "prompt": "Substitute 'sky' with 'sea' in 'blue sky above'" },
+  { "prompt": "Replace all letters in 'abc123' with '@'" },
+
   { "prompt": "Calculate the sum of 100 and 300" },
   { "prompt": "Add the numbers 7 and" },
   { "prompt": "What is 999 plus 1?" },
@@ -7,12 +28,10 @@
   { "prompt": "Add 0 and 42" },
   { "prompt": "What is the sum of 19 and 81?" },
   { "prompt": "Add 300 and 700" },
-  { "prompt": "Reverse the word 'Nice'" },
-  { "prompt": "Reverse the string '12345'" },
-  { "prompt": "Reverse the phrase 'open the door'" },
-  { "prompt": "Reverse the word 'mirror'" },
+
   { "prompt": "What is the sum of 12 and 8?" },
   { "prompt": "Add 45 and 55" },
+
   { "prompt": "Greet Sarah" },
   { "prompt": "Say hello to Mark" },
   { "prompt": "Greet my friend Lucas" },
@@ -23,13 +42,6 @@
   { "prompt": "Say hi to Chloe" },
   { "prompt": "Greet Benjamin politely" },
   { "prompt": "Greet 'Sophie' for me" },
-
-  { "prompt": "Reverse the word 'banana'" },
-  { "prompt": "Reverse the string 'abcdef'" },
-  { "prompt": "Reverse the phrase 'coding is fun'" },
-  { "prompt": "Reverse the string 'night sky'" },
-  { "prompt": "Reverse the phrase 'I love Python'" },
-  { "prompt": "Reverse the word 'dynamic'" },
 
   { "prompt": "What is the square root of 49?" },
   { "prompt": "Calculate the square root of 121" },
@@ -46,8 +58,10 @@
   { "prompt": "Reverse the string 'palindrome'" },
   { "prompt": "Add 56 and 44" },
   { "prompt": "What is the square root of 169?" },
-  { "prompt": "Greet my colleague Anna" },
+  { "prompt": "Greeionst my colleague Anna" },
   { "prompt": "Reverse the phrase 'testing reverse function'" },
   { "prompt": "Add 1 and 2" },
   { "prompt": "Compute the square root of 196" }
 ]
+
+

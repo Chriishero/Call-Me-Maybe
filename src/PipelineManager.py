@@ -7,6 +7,10 @@ import os
 
 
 class PipelineManager(BaseModel):
+    """
+    Manages the model, runs the generation pipeline on all
+    prompts, and saves the produced function-calling outputs.
+    """
     model_name: str
     prompts: list[dict[str, str]]
     functions_def: list[dict[str, Any]]
@@ -16,12 +20,15 @@ class PipelineManager(BaseModel):
 
     @property
     def output(self) -> list[dict[str, Any]]:
+        """Getter of the class attribute '_output'"""
         return self._output
 
     def load_model(self) -> None:
+        """Load the model and save it in the class attribute '_model'"""
         self._model = Small_LLM_Model(model_name=self.model_name)
 
     def generate_outputs(self, output_path: str) -> None:
+        """Runs the generation pipeline on all prompts."""
         self.load_model()
         i = 1
         self.check_output_dir(output_path=output_path)
@@ -45,6 +52,7 @@ class PipelineManager(BaseModel):
             output_path: str = "data/output/function_calling_results.json",
             to_save: dict[str, Any] = {}
             ) -> None:
+        """Save the function-calling outputs."""
         try:
             with open(output_path, 'r') as f:
                 content = list(json.loads(f.read()))
