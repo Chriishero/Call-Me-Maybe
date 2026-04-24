@@ -1,9 +1,9 @@
+from .ConstrainingDecoder import ConstrainingDecoder
+from .Input import Function, Prompt
+from llm_sdk import Small_LLM_Model
 from pydantic import BaseModel, PrivateAttr, Field
 from typing import Any, Optional
-from llm_sdk import Small_LLM_Model
 import json
-import numpy as np
-from .ConstrainingDecoder import ConstrainingDecoder
 
 
 class GenerationPipeline(BaseModel):
@@ -15,16 +15,15 @@ class GenerationPipeline(BaseModel):
         "arbitrary_types_allowed": True
     }
     model: Small_LLM_Model
-    prompt: str
-    functions_def: list[dict[str, Any]]
-    max_fn_tokens: int = Field(default=32)
-    max_param_tokens: int = Field(default=64)
+    prompt: Prompt
+    functions_definition: list[Function]
+    max_tokens: int = Field(default=64)
 
     _output: dict[str, Any] = PrivateAttr(default_factory=dict)
-    _new_prompt: str = PrivateAttr(default_factory=str)
-    _vocabulary: list[str] = PrivateAttr(default_factory=list)
+    _function: Optional[Function] = PrivateAttr(default=None)
+    _vocabulary: dict[int, str] = PrivateAttr(default_factory=dict)
+    _tokenizer: dict[str, Any] = PrivateAttr(default_factory=dict)
     _parameters_types: list[Any] = PrivateAttr(default_factory=list)
-    _generated_function: dict[Any, Any] = PrivateAttr(default_factory=dict)
 
     @property
     def output(self) -> dict[str, Any]:
@@ -35,114 +34,111 @@ class GenerationPipeline(BaseModel):
         """Generate the function-calling output by calling
         the two adequates functions for function name and parameters."""
         self.load_vocabulary()
+        self.load_tokenizer_file()
         decoder = ConstrainingDecoder(
-            prompt=self.prompt,
+            model=self.model,
+            prompt=self.prompt.prompt,
+            functions=self.functions_definition,
             vocabulary=self._vocabulary,
-            functions_def=self.functions_def
+            tokenizer=self._tokenizer,
+            max_tokens=self.max_tokens
         )
-        self._output = {"prompt": self.prompt, "name": "", "parameters": {}}
-        self._new_prompt = self.get_system_prompt()
+        self._output = {
+            "prompt": self.prompt.prompt,
+            "name": "",
+            "parameters": {}
+        }
         self.generate_function_name(decoder)
         self.generate_parameters(decoder)
 
     def generate_function_name(self, decoder: ConstrainingDecoder) -> None:
         """Execute the LLM pipeline and apply constrained decoding before
         token selection, to generate the function name."""
-        token_count = 0
-        while token_count < self.max_fn_tokens:
-            logits = self.llm_pipeline(self._new_prompt)
-            constrained_logits = decoder.constrain_function(
-                logits=logits,
-                current_function_name=self.output['name']
-            )
-            token = self.token_selection(constrained_logits)
-            if token is None:
-                break
-            self.output['name'] += token
-            self._new_prompt += token
-            token_count += 1
-            for function in self.functions_def:
-                if str(function['name']) == self.output['name']:
-                    self._generated_function = function
-                    break
-        if not self._generated_function:
-            raise ValueError(
-                f"Generated function name: {self.output['name']} does not "
-                "match any available function.")
+        f_prompt = self.get_function_system_prompt()
+        tokens = self.model.encode(f_prompt)[0].tolist()
+        logits: list[float] = self.model.get_logits_from_input_ids(
+            tokens
+        )
+        self._function = decoder.constrain_function(logits)
+        self._output['name'] = self._function.name
 
     def generate_parameters(self, decoder: ConstrainingDecoder) -> None:
-        """Execute the LLM pipeline and apply constrained decoding before
-        token selection, to generate the parameters."""
-        for p_name, type_dict \
-                in self._generated_function['parameters'].items():
-            p_type = type_dict['type']
-            self.output['parameters'][p_name] = ""
-            token_count = 0
-            while token_count < self.max_param_tokens:
-                logits = self.llm_pipeline(self._new_prompt)
-                constrained_logits = decoder.constrain_parameter(
-                    logits=logits,
-                    current_param=self.output['parameters'][p_name],
-                    parameter=(p_name, p_type)
-                )
-                token = self.token_selection(constrained_logits)
-                if token is None:
-                    break
-                if p_type == "string":
-                    token = token.replace("Ġ", " ")
-                else:
-                    token = token.replace("Ġ", "")
-                if decoder.parameters_condition(
-                    parameter=(p_name, p_type),
-                    next_value=self.output['parameters'][p_name] + token
-                        ) is False:
-                    break
-                self.output['parameters'][p_name] += token
-                self._new_prompt += token
-                token_count += 1
-            try:
-                if p_type == "number":
-                    self.output['parameters'][p_name] = float(
-                        self.output['parameters'][p_name]
-                    )
-            except Exception:
-                self.output['parameters'][p_name] = None
+        """Execute the LLM pipeline and apply constrained decoding to
+        generate the parameters of the generated function."""
+        if self._function is None:
+            return
+        p_prompt = self.get_parameters_system_prompt()
+        tokens = self.llm_encode(p_prompt)
+        eos_token_id = self._tokenizer["added_tokens"][-1]["id"]
+        for i, parameter in enumerate(self._function.parameters):
+            tokens += self.llm_encode(f'"{parameter.name}": ')
+            value, tokens = decoder.constrain_parameter(
+                tokens=tokens,
+                param_type=parameter.type,
+                eos_token_id=eos_token_id,
+            )
+            self._output['parameters'][parameter.name] = value
+            if i < len(self._function.parameters) - 1:
+                tokens += self.llm_encode(", ")
 
-    def get_system_prompt(self) -> str:
-        """Return the system prompt."""
-        return (
-            "You are a specialized agent in function calling.\n"
-            "Your goal is, from some available functions, "
-            "to give the right function name with the right "
-            "parameters to solve my prompts.\n"
-            "You must first generate the function name, then"
-            "the parameters with the right type.\n"
-            "The available functions are:"
-            f"{self.functions_def}\n"
-            f"and the prompt is {self.prompt}.\n")
-
-    def llm_pipeline(self, text: str) -> list[float]:
-        """Runs the tokenization and process the logits."""
-        input_ids = self.model.encode(text)
-        input_ids_list = input_ids[0].tolist()
-        logits: list[float] = self.model.get_logits_from_input_ids(
-            input_ids_list
+    def get_function_system_prompt(self) -> str:
+        """Return the function system prompt."""
+        functions_str = "\n".join(
+            f"[{i}] {fun.name}: {fun.description}"
+            for i, fun in enumerate(self.functions_definition)
         )
-        return logits
+        examples_str = "\n".join(
+            f"Request: '{fun.name} example' -> [{i}]"
+            for i, fun in enumerate(self.functions_definition)
+        )
+        return (f"Task: Match the request to the correct function index.\n\n"
+                f"Functions:\n{functions_str}\n\n"
+                f"Examples:\n{examples_str}\n\n"
+                f"Request: {self.prompt.prompt}\n\n"
+                f"The index of the most appropriate function is ["
+                )
 
-    def token_selection(self, logits: list[float]) -> Optional[str]:
-        """Return the token with the highest probability."""
-        trimmed = logits[:len(self._vocabulary)]
-        if all(x == float("-inf") for x in trimmed):
-            return None
-        best_index = np.argmax(trimmed)
-        return self._vocabulary[best_index]
+    def get_parameters_system_prompt(self) -> str:
+        """Return the parameters system prompt."""
+        if self._function is None:
+            return ""
+        params_str = "\n".join(
+            f"{param.name}: {param.type}"
+            for param in self._function.parameters
+        )
+        return (f"Task: Extract the parameters from the request.\n\n"
+                f"Function: {self._function.name}\n"
+                f"Parameters:\n{params_str}\n\n"
+                f"Request: {self.prompt.prompt}\n\n"
+                f"Rules:\n"
+                f"- Preserve ALL characters from the request exactly,"
+                f" including quotes.\n"
+                f"- For regex parameters: use character classes like [0-9] or "
+                f"[aeiouAEIOU] instead of literal values or alternations.\n"
+                f'- Escaped quotes in the request like \\"word\\" must stay'
+                f' as \\"word\\" in the output.\n\n'
+                f"Output ONLY a valid JSON with the parameter values.\n"
+                f"JSON: {{"
+                )
+
+    def llm_encode(self, text: str) -> Any:
+        return self.model.encode(text).int().tolist()[0]
 
     def load_vocabulary(self) -> None:
         """Load the vocabulary using by the LLM in '_vocabulary'."""
         try:
             with open(self.model.get_path_to_vocab_file(), 'r') as f:
-                vocab_dict: dict[str, int] = json.loads(f.read())
-            self._vocabulary = list(vocab_dict.keys())
+                vocab = json.loads(f.read())
+                self._vocabulary: dict[int, str] = {
+                    v: k for k, v in vocab.items()
+                }
         except FileNotFoundError as e:
             raise ValueError(f"Missing vocabulary file: {e}")
+
+    def load_tokenizer_file(self) -> None:
+        """Load the tokenizer file using by te LLM in '_tokenizer'."""
+        try:
+            with open(self.model.get_path_to_tokenizer_file()) as f:
+                self._tokenizer = json.loads(f.read())
+        except Exception as e:
+            raise ValueError(f"Missing tokenizer file: {e}")

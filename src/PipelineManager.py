@@ -1,7 +1,8 @@
-from pydantic import BaseModel, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr
 from typing import Any
 from llm_sdk import Small_LLM_Model
 from .GenerationPipeline import GenerationPipeline
+from .Input import Function, Prompt
 import json
 import os
 
@@ -12,8 +13,9 @@ class PipelineManager(BaseModel):
     prompts, and saves the produced function-calling outputs.
     """
     model_name: str
-    prompts: list[dict[str, str]]
-    functions_def: list[dict[str, Any]]
+    prompts: list[Prompt]
+    functions: list[Function]
+    max_tokens: int = Field(default=64)
 
     _model: Small_LLM_Model = PrivateAttr(default_factory=Small_LLM_Model)
     _output: list[dict[str, Any]] = PrivateAttr(default_factory=list)
@@ -36,13 +38,15 @@ class PipelineManager(BaseModel):
             f.write('[]')
         for i in range(len(self.prompts)):
             print(f"[{i + 1}/{len(self.prompts)}] Generating response for "
-                  f"\"{self.prompts[i]['prompt']}\" ...")
+                  f"\"{self.prompts[i].prompt}\" ...")
+
             gen = GenerationPipeline(
                 model=self._model,
-                prompt=self.prompts[i]['prompt'],
-                functions_def=self.functions_def
+                prompt=self.prompts[i],
+                functions_definition=self.functions
             )
             gen.generate_output()
+
             self.output.append(gen.output)
             self.save_output(output_path=output_path,
                              to_save=gen.output)

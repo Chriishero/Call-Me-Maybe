@@ -38,10 +38,11 @@ def main() -> None:
             fun_call_tests_path=input_path,
             funs_def_path=funs_def
         )
+        parser.parse()
         manager = PipelineManager(
             model_name="Qwen/Qwen3-0.6B",
-            prompts=parser.function_calling_tests,
-            functions_def=parser.functions_definition
+            prompts=parser.prompts,
+            functions=parser.functions
         )
         manager.generate_outputs(
             output_path=output_path

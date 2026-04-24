@@ -9,5 +9,18 @@ dependencies = [
     "pydantic>=2.13.2",
     "llm_sdk @ file:///${PROJECT_ROOT}/src/llm_sdk",
     "flake8>=7.3.0",
+	"flake8-pyproject",
     "mypy>=1.20.1",
+]
+
+[tool.mypy]
+exclude = [
+	"src/llm_sdk/",
+	".venv"
+]
+
+[tool.flake8]
+exclude = [
+    "src/llm_sdk",
+	".venv"
 ]
